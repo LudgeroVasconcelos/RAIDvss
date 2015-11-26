@@ -1,0 +1,79 @@
+#!/bin/bash
+
+##########################################
+#	Sistemas Operativos 2013/2014		
+#							
+#	Grupo:			so003		
+#	Diogo Pinto		Nº 43299	
+#	Ludgero de Vasconcelos	Nº 43259	
+#	Pedro Cerca		Nº 44030	
+#							
+##########################################
+
+exitError(){
+case $1 in
+	1) echo "Error: missing first argument." >&2;;
+	2) echo "Error: First argument must be a number." >&2;;
+	3) echo "Error: no such directory." >&2;;
+esac
+
+exit 1
+}
+
+numero() {
+[[ $1 =~ ^[0-9]+$ ]]
+}
+
+
+# Test if first argument is a digit and isnt missing 
+if [ $# -eq 0 ]; then
+	exitError 1
+elif ! numero $1 ; then
+	exitError 2
+fi
+
+if [ $2 ]; then
+
+	if ! [ -d $2 ]; then
+		exitError 3
+	fi
+
+	cd "$2"      	# change to directory given by user
+fi
+
+for i in *.log* ; do
+
+	n_words=`echo "$i" | tr . " " | wc -w`	# count words delimited by '.'
+
+	if [[ "$i" == *.*.log.gz ]]; then 
+
+		name_column=`expr $n_words - 3`	# column number of file name
+		age_column=`expr $n_words - 2`	# column number of file antiquity
+
+		name=`echo $i | cut -d '.' -f1-$name_column`
+		age=`echo $i | cut -d '.' -f$age_column`
+     
+		if numero $age ; then
+
+			if [ $age -lt $1 ] ; then # rename file, increment file antiquity
+
+				age=`expr $age + 1`
+				new_name=`expr ${name}.${age}.log.gz`
+				mv "$i" $new_name
+
+			elif [ $age -ge $1 ] ; then # delete file
+				rm "$i"
+			fi
+		fi
+
+	elif [[ "$i" == *.log ]] ; then
+
+		name_column=`expr $n_words - 1`
+		name=`echo $i | cut -d '.' -f1-$name_column`
+		new_name1=`expr ${name}.0.log`
+		mv "$i" $new_name1	# increment file antiquity
+		gzip $new_name1    	# compress file 
+
+	fi
+done
+

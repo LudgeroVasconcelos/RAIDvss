@@ -1,0 +1,305 @@
+#!/bin/bash
+
+##########################################
+#	Sistemas Operativos 2013/2014		
+#							
+#	Grupo:			so003
+#	Diogo Pinto		Nº 43299
+#	Ludgero de Vasconcelos	Nº 43259
+#	Pedro Cerca		Nº 44030
+#							
+##########################################
+
+# NOTA: A opcao -f pode ser especificada antes ou depois dos restantes argumentos.
+
+# TIP: comecar a ler o codigo a partir da linha 258
+
+echoHelp() {
+echo "Utilização: vsscfg [-f ficheiro] [-d [id tamanho] | -c [nome id id
+ficheiro] | -v]
+Prepara ficheiros de configuração do simulador de Raid1.
+Quando invocado sem argumentos, o comando lista o conteudo do ficheiro passado 
+como argumento.
+
+ -f, --ficheiro		permite definir um nome de ficheiro alternativo. Caso não seja 
+			invocada esta opção será criado/utilizado o ficheiro config.vss
+ -d, --disco		adiciona um disco com a identifição do id e do número de setores 
+			indicado. disc <id> <setores>. No caso de ausencia de argumentos 
+			estes serão lidos a partir do stdin.
+ -c, --configurar	adiciona uma configuração com os argumentos indicados.
+			raidvss <nome> <id disco> <id disco> <ficheiro>. No caso de 
+			ausencia de argumentos estes serão lidos a partir do stdin.
+ -v, --verificar	faz a validação do ficheiro de configuração, verificando:
+			Que os discos em cada configuraçáo tém o mesmo número de setores;
+			Que o mesmo disco não é utilizado duas vezes na mesma configuração;
+			Que as imagens dos discos existem e têm a mesma dimensão (em bytes) 
+			igual ao número de setores;
+			Que não existem dois ou mais discos ou configurações com o mesmo 
+			nome;
+			Que os discos utilizados em todas as configurações foram declarados.
+	--help exibir esta ajuda e sair
+
+id e nome são conjuntos de caracteres alfanuméricos sem espaços.
+
+Relatar erros vsscfg para 
+Diogo Pinto 		(fc43299@alunos.fc.ul.pt)
+Ludgero de Vasconcelos 	(fc43259@alunos.fc.ul.pt) 
+Pedro Cerca 		(fc44030@alunos.fc.ul.pt)
+Ajuda geral sobre a utilização de software GNU: <http://www.gnu.org/gethelp/>"
+}
+
+exitError() {
+help="Execute \`vsscfg.sh --help' para mais informacoes."
+
+echo -n "Erro: "
+
+case $1 in
+	1) echo -e "A opcao -f deve conter exatamente um argumento e estar posicionada
+antes ou depois das restantes opcoes.\n$help" >&2;;
+	2) echo -e "A opcao -d deve conter zero ou dois argumentos\n$help" >&2;;
+	3) echo "id do disco deve conter apenas caracteres alfa numericos." >&2;;
+	4) echo "O numero de setores do disco deve ser um numero inteiro." >&2;;
+	5) echo -e "A opcao -c deve conter zero ou quatro argumentos.\n$help" >&2;;
+	6) echo "O nome da configuracao e os ids dos discos devem conter apenas
+caracteres alfa numericos." >&2;;
+	7) echo -e "A opcao -v nao tem argumentos.\n$help" >&2;;
+	8) echo -e "\`$2' nao eh uma opcao valida.\n$help" >&2;;
+esac
+
+exit 1 
+
+}
+
+defineFicheiro() {
+if [ $1 ]; then			# se o utilizador introduziu um nome para o ficheiro
+	if [ ! -f $1 ]; then	# se o ficheiro nao existe
+		echo "" > $1
+	fi
+	FICHEIRO=$1			# define o ficheiro
+else
+	exitError 1
+fi
+}
+
+
+# esta funcao trata a opcao -f
+
+opcaoF() {
+find_F=`echo $* | egrep -w -o '\-f|\--ficheiro'`	# procura a opcao -f
+
+if [ $find_F ]; then		# verifica se -f eh o primeiro ou penultimo argumento
+
+	local P_ARG=${@: -2:1}			# penultimo argumento
+
+	if [ $1 = "-f" ] || [ $1 = "--ficheiro" ]; then
+		defineFicheiro $2
+		RESULT="start"			# a opt -f foi definida no inicio
+
+	elif [ $P_ARG = "-f" ] || [ $P_ARG = "--ficheiro" ]; then
+		defineFicheiro ${@: -1}		# ${@: -1} eh o ultimo argumento
+		RESULT="end"			# -f foi definido no fim
+	
+	else			# a opcao -f nao foi especificada correctamente
+		exitError 1
+	fi
+
+else		# a opcao -f nao foi especificada
+	defineFicheiro "config.vss"
+fi
+}
+
+# testa se o argumento eh um numero inteiro
+numero() {
+[[ $1 =~ ^[0-9]+$ ]]
+}
+
+# testa se o argumento eh um conjunto de caracteres alfa numericos
+alfaNumerico(){
+[[ $1 =~ ^[0-9a-zA-Z]+$ ]]
+}
+
+
+addDisc() {
+local ID=$1
+local SIZE=$2
+
+if [ $# -eq 0 ]; then
+	echo "Insira um id para o disco: "
+	read ID
+	echo "Insira o numero de setores do disco: "
+	read SIZE
+
+elif [ $# -ne 2 ]; then
+	exitError 2
+fi
+
+# verifica se id eh um conjunto de caracteres alfa numericos
+if ! alfaNumerico $ID; then
+	exitError 3
+
+# verifica se tamanho do disco eh um numero inteiro
+elif ! numero $SIZE; then
+	exitError 4
+
+# os argumentos estao correctos, adiciona o disco ao ficheiro de configuracao
+else
+	sed -i "1i\disc $ID $SIZE" $FICHEIRO
+fi
+}
+
+addConfig() {
+local NOME=$1
+local ID1=$2
+local ID2=$3
+local IMG=$4
+
+if [ $# -eq 0 ]; then
+	
+	echo "Insira o nome da configuracao: "
+	read NOME
+	echo "Insira o id do disco 1: "
+	read ID1
+	echo "Insira o id do disco 2: "
+	read ID2
+	echo "Insira o nome do ficheiro de imagem: "
+	read IMG
+
+elif [ $# -ne 4 ]; then
+	exitError 5
+fi
+
+if ! (alfaNumerico $NOME && alfaNumerico $ID1 && alfaNumerico $ID2); then
+	exitError 6
+else
+	echo "raidvss $NOME $ID1 $ID2 $IMG" >> $FICHEIRO
+fi
+}
+
+erroValidacao() {
+ERRO=1	# ocorreu um erro de validacao
+
+# verifica se eh o primeiro erro da configuracao $2. Só entra uma vez a cada cfg
+if [ "$2" != "$lastCFG" ]; then
+	echo -e "\nErro de validacao na configuracao $2:"
+	lastCFG=$2
+fi
+case $1 in
+	1) echo "Erro: Impossivel efectuar validacao.
+Existem dois ou mais discos ou configuracoes com o mesmo nome.";;
+	2) echo "-Um ou dois discos nao foram declarados.";;
+	3) echo "-Os discos nao tem o mesmo numero de setores.";;
+	4) echo "-O mesmo disco esta a ser utilizado duas vezes.";;
+	5) echo "-A imagem do disco nao existe.";;
+	6) echo "-A dimensao da imagem nao eh igual ao numero de setores do disco.";;
+esac
+}
+
+validacao() {
+if [ $# -gt 0 ]; then
+	exitError 7
+fi
+
+# verifica se nao existem dois ou mais discos ou configuracoes com o mesmo nome.
+# unica validacao que faz terminar o programa
+aux=`egrep -v '^$|^#' $FICHEIRO | cut -d' ' -f2 | sort | uniq -d`
+if [ "$aux" ]; then
+	erroValidacao 1
+	exit 1
+fi
+
+ERRO=0	# flag que indica se há erros no ficheiro
+
+# cfg contem "c1 d1 d2 img" de todas as configuracoes
+local cfg=(`grep raidvss $FICHEIRO | cut -d' ' -f 2-5`)
+local size=`grep -c raidvss $FICHEIRO`		# numero de configuracoes
+
+local index=0
+# percorre todas as configuracoes, valindado-as
+for ((i = 1; i <= $size; i++))
+do
+	lastCFG=""	# (ver metodo acima)
+
+	# variaveis com nome da cfg, id dos discos e nome dos ficheiros de imagem
+	local c1=${cfg[index]}
+	local d1=${cfg[index+1]}
+	local d2=${cfg[index+2]}
+	local img=${cfg[index+3]}
+
+	# valida o nome dos discos
+	if [ $d1 = $d2 ]; then
+		erroValidacao 4 $c1
+	fi
+
+	# verifica se os discos foram declarados
+	local dd1=`grep -w "disc $d1" $FICHEIRO | cut -d' ' -f2`
+	local dd2=`grep -w "disc $d2" $FICHEIRO | cut -d' ' -f2`
+
+	if ! ([ $dd1 ] && [ $dd2 ]); then	# ha discos que nao foram declarados
+		erroValidacao 2 $c1
+
+		# valida a existencia da imagem
+		if [ ! -f $img ]; then
+			erroValidacao 5 $c1
+		fi
+	else
+		# valida o numero de setores dos discos
+		local d1Setores=`grep -w "disc $d1" $FICHEIRO | cut -d' ' -f3`
+		local d2Setores=`grep -w "disc $d2" $FICHEIRO | cut -d' ' -f3`
+		if [ $d1Setores -ne $d2Setores ]; then
+			erroValidacao 3 $c1
+		fi
+
+		# valida a existencia da imagem e a sua dimensao
+		if [ ! -f $img ]; then
+			erroValidacao 5 $c1
+		else
+			local imgSize=`ls -l $img | cut -d' ' -f5`
+			if [ $imgSize -ne $d1Setores ]; then
+				erroValidacao 6 $c1
+			fi
+		fi
+	fi
+	
+	# incrementa o index para este apontar para a proxima configuracao
+	index=`expr $index + 4`
+done
+
+if [ $ERRO -eq 0 ]; then
+	echo "A validacao do ficheiro $FICHEIRO foi efectuada com sucesso.
+Nenhum erro foi encontrado."
+fi 
+}
+
+menu() {
+if [ $# -eq 0 ]; then
+	cat $FICHEIRO
+
+else
+	local OPTION=$1
+	shift
+
+	case $OPTION in
+		-d|--disco)		addDisc $*;;
+		-c|--configurar)	addConfig $*;;
+		-v|--validar)		validacao $*;;
+		--help)			echoHelp;;
+		*) 			exitError 8 $OPTION;;
+	esac
+fi
+}
+
+
+FICHEIRO=""	# ficheiro a utilizar em toda a execucao do script
+RESULT=""	# indica se a opcao -f foi definida no inicio ou no fim
+
+opcaoF $*	# trata a opcao -f (linha: 53)
+
+# limpa os argumentos "-f nome_do_ficheiro" do inicio ou do fim
+if [ "$RESULT" = "start" ]; then
+	shift 2
+elif [ "$RESULT" = "end" ]; then
+	set -- ${@: 1:($#-2)}
+fi
+
+menu $*
+

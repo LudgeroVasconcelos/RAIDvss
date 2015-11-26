@@ -1,0 +1,21 @@
+#!/bin/bash
+
+##########################################
+#	Sistemas Operativos 2013/2014		
+#							
+#	Grupo:			so003		
+#	Diogo Pinto		Nº 43299	
+#	Ludgero de Vasconcelos	Nº 43259	
+#	Pedro Cerca		Nº 44030	
+#							
+##########################################
+
+if [ $# -eq 0 ]
+then echo "Erro: Especifique o tamanho da imagem" >&2
+
+elif ! [[ $1 =~ ^[0-9]+$ ]]		# verifica se o argumento eh um numero inteiro
+then echo "Erro: Por favor insira um numero inteiro" >&2
+
+else strings /dev/urandom | dd bs=1 count=$1
+fi
+
